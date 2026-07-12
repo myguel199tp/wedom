@@ -13,9 +13,9 @@ validación antes de confirmarse. Para conciliar ambas cosas, el saldo se separa
 
 Toda transferencia debita al instante el disponible del remitente:
 
-- ≤ umbral → se acredita al destinatario en la misma transacción (`COMPLETED`).
-- > umbral → queda retenida (`PENDING_REVIEW`) hasta que un admin la apruebe
-  > (`COMPLETED`) o la rechace (`REJECTED`, con reversa al remitente).
+- Monto ≤ umbral → se acredita al destinatario en la misma transacción (`COMPLETED`).
+- Monto > umbral → queda retenida (`PENDING_REVIEW`) hasta que un admin la apruebe
+  (`COMPLETED`) o la rechace (`REJECTED`, con reversa al remitente).
 
 El débito inmediato previene el doble gasto, y retener sin acreditar respeta la
 política de cumplimiento sin perder dinero (`Σ disponible + Σ pendiente = constante`).
@@ -106,7 +106,7 @@ un `code` estable en lugar de parsear mensajes.
 
 ---
 
-Nota sobre el uso de IA
+## Nota sobre el uso de IA
 
 Se utilizó Claude Code (Anthropic) como herramienta de apoyo para tareas repetitivas, la generación de la estructura inicial de algunos módulos, DTOs, configuración de Docker, documentación, borradores de pruebas y apoyo en decisiones de diseño de la interfaz (como selección de colores, estilos y distribución de algunos componentes).
 

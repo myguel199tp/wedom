@@ -122,7 +122,9 @@ de **saldo pendiente**:
      **retenido** (no acreditado al destinatario) → estado **`PENDING_REVIEW`**, a la
      espera de la validación de cumplimiento (admin). Responde _"¿está permitida
      esta operación?"_ (AML).
-  - El destinatario lo ve como `pendingIncoming` (no gastable todavía).
+  - El destinatario **no** ve este dinero: no se le acredita ni se le expone como
+    pendiente mientras esté en revisión, porque aún no le pertenece y la operación
+    podría rechazarse.
   - Un administrador de cumplimiento **aprueba** (se acredita → `COMPLETED`) o
     **rechaza** (se **reversa** al remitente → `REJECTED`).
 
@@ -189,8 +191,7 @@ administradores por dos endpoints de solo lectura.
 
 Así, el invariante descrito arriba deja de ser una promesa del código y se vuelve
 **comprobable en caliente**: cualquiera con rol admin puede pedir la conciliación y
-confirmar que el sistema no ha perdido ni duplicado dinero. El frontend consume este
-endpoint y lo muestra como una tarjeta semáforo (verde = cuadra / rojo = no cuadra).
+confirmar que el sistema no ha perdido ni duplicado dinero.
 
 ---
 
@@ -201,7 +202,10 @@ El endpoint admin marca una transacción con una o más señales:
 | Señal                    | Definición                                                                                                                          |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `LARGE_AMOUNT`           | Monto por encima del umbral de cumplimiento (> $1.000 USD).                                                                         |
+| `VERY_LARGE_AMOUNT`      | Monto por encima de un segundo umbral "muy superior" (> $3.000 USD, config `SUSPICIOUS_VERY_LARGE_AMOUNT_USD`). Acumulativa con la anterior. |
 | `HIGH_VELOCITY`          | El mismo remitente hizo más de N transferencias en una ventana corta (config `VELOCITY_MAX_TRANSFERS` / `VELOCITY_WINDOW_SECONDS`). |
+| `STRUCTURING`            | Fragmentación (smurfing): ≥ N envíos por debajo del umbral cuya suma lo supera dentro de una ventana (config `SUSPICIOUS_STRUCTURING_MIN_COUNT` / `SUSPICIOUS_STRUCTURING_WINDOW_SECONDS`). |
+| `ODD_HOURS`              | Transferencia iniciada en franja horaria inusual, evaluada en la zona horaria de negocio (config `SUSPICIOUS_ODD_HOURS_START` / `SUSPICIOUS_ODD_HOURS_END` / `SUSPICIOUS_TIMEZONE`; soporta cruzar medianoche). |
 | `REJECTED_BY_COMPLIANCE` | La transacción fue rechazada en la validación de cumplimiento.                                                                      |
 
 La respuesta incluye, por cada transacción marcada, **el porqué** (`reasons`) para
@@ -257,11 +261,10 @@ src/
   admin/     → transacciones sospechosas + aprobar/rechazar
   mailer/    → correos (SMTP/MailHog, desacoplado del proveedor)
   common/    → dinero (centavos), errores semánticos, filtro global
-docs/
-  diagrams.md → diagramas de contexto y de contenedores (C4)
 ```
 
-Diagramas de diseño: [`docs/diagrams.md`](docs/diagrams.md).
+Los diagramas de diseño (contexto y contenedores) se entregan en el documento de
+análisis, por separado de este repositorio.
 
 ---
 
@@ -271,8 +274,8 @@ Diagramas de diseño: [`docs/diagrams.md`](docs/diagrams.md).
   inicial es un _faucet_ de demo (`INITIAL_BALANCE_USD`). En un sistema real, el
   ingreso de fondos sería otro flujo (depósito/pasarela) con su propia conciliación.
 - **`synchronize: true` en el demo.** La BD se crea automáticamente para facilitar
-  el arranque. En producción esto **debe** apagarse y usar migraciones (ya hay
-  `data-source.ts` y scripts `migration:*` preparados).
+  el arranque. En producción esto **debe** apagarse y usar migraciones versionadas
+  (el `data-source.ts` en la raíz queda listo como punto de partida para generarlas).
 - **Validación de cumplimiento manual.** La aprobación de montos > $1.000 la hace
   un admin por endpoint. No hay un motor de reglas automático ni integración con un
   proveedor KYC/AML real.
@@ -298,8 +301,8 @@ Diagramas de diseño: [`docs/diagrams.md`](docs/diagrams.md).
   historial/consultas, _connection pooling_ (PgBouncer) y particionar `transactions`
   y `ledger_entries` por fecha.
 - **Validación de cumplimiento asíncrona.** Mover la revisión de montos altos a una
-  **cola** (BullMQ/Redis, ya usado en el proyecto de origen) con un motor de reglas
-  o un proveedor KYC/AML; la API solo encola y responde `PENDING_REVIEW`.
+  **cola** (p. ej. BullMQ/Redis) con un motor de reglas o un proveedor KYC/AML; la
+  API solo encola y responde `PENDING_REVIEW`.
 - **Correos y notificaciones fuera del request.** Encolar el envío (cola + worker)
   para que el correo no acople la latencia de la transferencia, con reintentos y
   _dead-letter_.
@@ -312,5 +315,3 @@ Diagramas de diseño: [`docs/diagrams.md`](docs/diagrams.md).
   header `Idempotency-Key` estándar en el gateway.
 - **Migraciones.** Cambiar `synchronize` por migraciones versionadas en el pipeline
   de despliegue.
-#   w e d o m  
- 
