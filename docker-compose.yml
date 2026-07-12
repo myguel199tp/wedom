@@ -1,0 +1,61 @@
+# MiniWallet — se levanta completo con: docker compose up --build
+# Servicios: API (NestJS) + Postgres + MailHog (bandeja de correo local)
+services:
+  api:
+    build: .
+    container_name: miniwallet-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: miniwallet
+      DB_PASSWORD: miniwallet
+      DB_NAME: miniwallet
+      DB_SYNCHRONIZE: "true"
+      JWT_SECRET: super-secret-change-me
+      JWT_EXPIRES_IN: 24h
+      FRONTEND_URL: http://localhost:3001
+      CORS_ORIGINS: http://localhost:3001
+      INITIAL_BALANCE_USD: "5000"
+      COMPLIANCE_THRESHOLD_USD: "1000"
+      VELOCITY_MAX_TRANSFERS: "5"
+      VELOCITY_WINDOW_SECONDS: "60"
+      MAIL_HOST: mailhog
+      MAIL_PORT: "1025"
+      MAIL_FROM: MiniWallet <no-reply@miniwallet.local>
+      ADMIN_EMAIL: admin@miniwallet.local
+      ADMIN_PASSWORD: Admin123*
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: miniwallet-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: miniwallet
+      POSTGRES_PASSWORD: miniwallet
+      POSTGRES_DB: miniwallet
+    volumes:
+      - miniwallet_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U miniwallet -d miniwallet"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: miniwallet-mailhog
+    restart: unless-stopped
+    ports:
+      - "8025:8025" # UI web para ver los correos: http://localhost:8025
+      - "1025:1025" # SMTP
+
+volumes:
+  miniwallet_pg:
